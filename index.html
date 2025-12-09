@@ -1,41 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SoundCloud Social</title>
+  <style>
+    body { font-family: Arial; max-width: 600px; margin: auto; padding: 20px; }
+    #feed { margin-top: 20px; }
+    .post { border-bottom: 1px solid #ddd; padding: 10px 0; }
+    .user { font-weight: bold; }
+    input, textarea { width: 100%; box-sizing: border-box; margin-top: 5px; }
+    textarea { height: 60px; }
+    button { padding: 5px 10px; margin-top: 5px; cursor: pointer; }
+    .like-btn { margin-top: 5px; }
+    .status { margin-top: 10px; font-size: 14px; color: #555; }
+  </style>
+</head>
+<body>
+
+<h2>Share SoundCloud Tracks</h2>
+
+<div>
+  <input type="text" id="user" placeholder="Your name">
+  <input type="text" id="url" placeholder="SoundCloud track or playlist URL">
+  <button id="postBtn">Post</button>
+  <div class="status" id="status"></div>
+</div>
+
 <div id="feed">Loading posts...</div>
 
 <script>
 const WORKER_URL = "https://cool-hall-3591.thebigbugatti24-8a8.workers.dev";
 
+// Convert SoundCloud URL to embed iframe
 function soundcloudEmbed(url) {
   const encoded = encodeURIComponent(url);
   return `<iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay"
           src="https://w.soundcloud.com/player/?url=${encoded}&color=%23ff5500&auto_play=false"></iframe>`;
 }
 
-async function likePost(postId) {
-  await fetch(WORKER_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "like", postId })
-  });
-  loadFeed(); // refresh feed
-}
-
+// Load posts and render feed
 async function loadFeed() {
-  const res = await fetch(WORKER_URL);
-  const data = await res.json();
-  const feed = document.getElementById("feed");
-  feed.innerHTML = "";
-  data.posts.forEach(post => {
-    const div = document.createElement("div");
-    div.className = "post";
-    div.innerHTML = `
-      <span class="user">${post.user}</span><br>
-      ${soundcloudEmbed(post.url)}
-      <br>
-      <button onclick="likePost(${post.id})">👍 Like (${post.likes || 0})</button>
-    `;
-    feed.appendChild(div);
-  });
+  try {
+    const res = await fetch(WORKER_URL);
+    const data = await res.json();
+    const feed = document.getElementById("feed");
+    feed.innerHTML = "";
+
+    data.posts.forEach(post => {
+      const div = document.createElement("div");
+      div.className = "post";
+      div.innerHTML = `
+        <span class="user">${post.user}</span><br>
+        ${soundcloudEmbed(post.url)}
+        <br>
+        <button class="like-btn" onclick="likePost(${post.id})">👍 Like (${post.likes || 0})</button>
+      `;
+      feed.appendChild(div);
+    });
+  } catch (err) {
+    document.getElementById("feed").innerHTML = "Error loading feed";
+    console.error(err);
+  }
 }
 
+// Add a new post
+async function addPost() {
+  const user = document.getElementById("user").value || "Anonymous";
+  const url = document.getElementById("url").value;
+  if (!url) return;
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user, url })
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById("status").textContent = "Posted!";
+      document.getElementById("url").value = "";
+      loadFeed();
+    } else {
+      document.getElementById("status").textContent = "Error posting";
+    }
+  } catch (err) {
+    document.getElementById("status").textContent = "Error posting";
+    console.error(err);
+  }
+}
+
+// Like a post
+async function likePost(postId) {
+  try {
+    await fetch(WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "like", postId })
+    });
+    loadFeed();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+document.getElementById("postBtn").addEventListener("click", addPost);
+
+// Initial load and auto-refresh
 loadFeed();
 setInterval(loadFeed, 3000);
 </script>
+
+</body>
+</html>
