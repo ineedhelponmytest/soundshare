@@ -1,83 +1,41 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>SoundShare</title>
-  <style>
-    body { font-family: Arial; max-width: 600px; margin: auto; padding: 20px; }
-    #feed { margin-top: 20px; }
-    .post { border-bottom: 1px solid #ddd; padding: 10px 0; }
-    .user { font-weight: bold; }
-    input, textarea { width: 100%; }
-    textarea { height: 60px; }
-    button { padding: 5px 10px; margin-top: 5px; }
-  </style>
-</head>
-<body>
-
-<h2>Share SoundCloud Tracks</h2>
-
-<div>
-  <input type="text" id="user" placeholder="Your name">
-  <input type="text" id="url" placeholder="SoundCloud track or playlist URL">
-  <button id="postBtn">Post</button>
-</div>
-
-<div id="status"></div>
 <div id="feed">Loading posts...</div>
 
 <script>
 const WORKER_URL = "https://cool-hall-3591.thebigbugatti24-8a8.workers.dev";
 
-// Convert SoundCloud URL to embed iframe
 function soundcloudEmbed(url) {
   const encoded = encodeURIComponent(url);
-  return `<iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encoded}&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true"></iframe>`;
+  return `<iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay"
+          src="https://w.soundcloud.com/player/?url=${encoded}&color=%23ff5500&auto_play=false"></iframe>`;
+}
+
+async function likePost(postId) {
+  await fetch(WORKER_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "like", postId })
+  });
+  loadFeed(); // refresh feed
 }
 
 async function loadFeed() {
-  try {
-    const res = await fetch(WORKER_URL);
-    const data = await res.json();
-    const feed = document.getElementById("feed");
-    feed.innerHTML = "";
-    data.posts.forEach(post => {
-      const div = document.createElement("div");
-      div.className = "post";
-      div.innerHTML = `<span class="user">${post.user}</span>:<br>${soundcloudEmbed(post.url)}`;
-      feed.appendChild(div);
-    });
-  } catch (err) {
-    document.getElementById("feed").innerHTML = "Error loading feed";
-    console.error(err);
-  }
+  const res = await fetch(WORKER_URL);
+  const data = await res.json();
+  const feed = document.getElementById("feed");
+  feed.innerHTML = "";
+  data.posts.forEach(post => {
+    const div = document.createElement("div");
+    div.className = "post";
+    div.innerHTML = `
+      <span class="user">${post.user}</span><br>
+      ${soundcloudEmbed(post.url)}
+      <br>
+      <button onclick="likePost(${post.id})">👍 Like (${post.likes || 0})</button>
+    `;
+    feed.appendChild(div);
+  });
 }
 
-async function addPost() {
-  const user = document.getElementById("user").value || "Anonymous";
-  const url = document.getElementById("url").value;
-  if (!url) return;
-
-  try {
-    await fetch(WORKER_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user, url })
-    });
-    document.getElementById("status").textContent = "Posted!";
-    document.getElementById("url").value = "";
-    loadFeed();
-  } catch (err) {
-    document.getElementById("status").textContent = "Error posting";
-    console.error(err);
-  }
-}
-
-document.getElementById("postBtn").addEventListener("click", addPost);
-
-// Load feed every 3 seconds
 loadFeed();
 setInterval(loadFeed, 3000);
 </script>
-
-</body>
-</html>
